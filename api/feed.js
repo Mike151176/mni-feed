@@ -4,14 +4,18 @@ module.exports = async (req, res) => {
 
   const BASE = "https://www.mikenaumannimmobilien.com";
 
-  const clean = (str = "") =>
+  const decodeHtml = (str = "") =>
     String(str)
       .replace(/<!\[CDATA\[(.*?)\]\]>/gs, "$1")
       .replace(/&nbsp;/g, " ")
-      .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
       .replace(/&amp;/g, "&")
       .replace(/&quot;/g, '"')
       .replace(/&#39;/g, "'")
+      .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
+      .trim();
+
+  const stripTags = (str = "") =>
+    decodeHtml(str)
       .replace(/<[^>]+>/g, " ")
       .replace(/\s+/g, " ")
       .trim();
@@ -36,96 +40,106 @@ module.exports = async (req, res) => {
 
   const extractListingLinks = (html) => {
     const links = new Set();
+    const pattern = /href="([^"]*\/de\/[^"]*zum-verkauf-in-malaga\/[^"]*\/s2)"/gi;
 
-    const patterns = [
-      /href="([^"]*\/de\/[^"]*\/s2)"/gi,
-      /href="([^"]*\/de\/[^"]*zum-verkauf-in-malaga[^"]*)"/gi
-    ];
-
-    for (const pattern of patterns) {
-      let match;
-      while ((match = pattern.exec(html)) !== null) {
-        links.add(toAbs(match[1]));
-      }
+    let match;
+    while ((match = pattern.exec(html)) !== null) {
+      links.add(toAbs(match[1]));
     }
 
     return [...links];
   };
 
+  const titleFromUrl = (url) => {
+    const slug = url.split("/de/")[1]?.split("/s2")[0] || "";
+    return slug
+      .replace(/-zum-verkauf-in-malaga/gi, "")
+      .replace(/-/g, " ")
+      .replace(/\b\w/g, (m) => m.toUpperCase())
+      .trim();
+  };
+
+  const inferType = (title, url) => {
+    const text = `${title} ${url}`.toLowerCase();
+    if (text.includes("apartment") || text.includes("appartment")) return "Apartment";
+    if (text.includes("penthouse")) return "Penthouse";
+    if (text.includes("villa")) return "Villa";
+    if (text.includes("finca")) return "Finca";
+    if (text.includes("townhouse") || text.includes("adosado")) return "Townhouse";
+    return "Immobilie";
+  };
+
   const pickImage = (html) => {
     const patterns = [
-      /property_\d+_\d+\.(?:jpg|jpeg|png|webp)/i,
       /<meta[^>]+property="og:image"[^>]+content="([^"]+)"/i,
-      /<img[^>]+src="([^"]+)"/i
+      /<meta[^>]+name="twitter:image"[^>]+content="([^"]+)"/i,
+      /<img[^>]+src="([^"]*property_[^"]+\.(?:jpg|jpeg|png|webp))"/i,
+      /<img[^>]+data-src="([^"]*property_[^"]+\.(?:jpg|jpeg|png|webp))"/i
     ];
 
     for (const pattern of patterns) {
       const match = html.match(pattern);
-      if (!match) continue;
-
-      if (match[1] && match[1].startsWith("http")) return match[1];
-      if (match[0] && match[0].startsWith("property_")) return "";
-      if (match[0] && /property_\d+_\d+\.(?:jpg|jpeg|png|webp)/i.test(match[0])) {
-        const file = match[0].match(/property_\d+_\d+\.(?:jpg|jpeg|png|webp)/i)[0];
-        return `${BASE}/_inmoenter/resources/cached/watermark/inmoenter/resources/757/properties/${file}`;
-      }
-      if (match[1]) return toAbs(match[1]);
+      if (match && match[1]) return toAbs(decodeHtml(match[1]));
     }
 
     return "";
   };
 
+  const pickDescription = (html, fallbackTitle) => {
+    const meta =
+      html.match(/<meta[^>]+name="description"[^>]+content="([^"]+)"/i) ||
+      html.match(/<meta[^>]+property="og:description"[^>]+content="([^"]+)"/i);
+
+    const text = stripTags(meta ? meta[1] : "");
+    if (!text || /verwendung von cookies/i.test(text)) return fallbackTitle;
+    return text;
+  };
+
   const parseDetail = (url, html) => {
-    const titleMatch =
+    const rawTitle =
+      html.match(/<meta[^>]+property="og:title"[^>]+content="([^"]+)"/i) ||
       html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i) ||
       html.match(/<title>([\s\S]*?)<\/title>/i);
 
-    const title = clean(titleMatch ? titleMatch[1] : "Immobilie in Málaga");
+    let title = stripTags(rawTitle ? rawTitle[1] : "");
+    if (!title || /verwendung von cookies/i.test(title)) {
+      title = titleFromUrl(url);
+    }
+
+    title = title
+      .replace(/\s*\|\s*Mike Naumann Immobilien.*$/i, "")
+      .replace(/\s*-\s*Mike Naumann Immobilien.*$/i, "")
+      .trim();
 
     const priceMatch =
       html.match(/(\d{1,3}(?:\.\d{3})+)\s*€/i) ||
       html.match(/(\d{3,7})\s*€/i);
 
-    const price = priceMatch
-      ? Number(priceMatch[1].replace(/\./g, ""))
-      : 0;
+    const price = priceMatch ? Number(priceMatch[1].replace(/\./g, "")) : 0;
 
-    const bedsMatch = html.match(/(\d+)\s*(?:Schlafzimmer|bedrooms|hab\.)/i);
-    const bathsMatch = html.match(/(\d+)\s*(?:Badezimmer|bathrooms|baños)/i);
+    const bedsMatch =
+      html.match(/(\d+)\s*(?:Schlafzimmer|bedrooms|habitaciones|hab\.)/i);
+    const bathsMatch =
+      html.match(/(\d+)\s*(?:Badezimmer|bathrooms|baños)/i);
     const m2Match = html.match(/(\d+)\s*m(?:²|2)/i);
-
-    const descriptionMeta =
-      html.match(/<meta[^>]+name="description"[^>]+content="([^"]+)"/i) ||
-      html.match(/<meta[^>]+property="og:description"[^>]+content="([^"]+)"/i);
 
     return {
       title,
       price,
       location: "Málaga",
-      type: /appartment|apartment/i.test(title)
-        ? "Apartment"
-        : /penthouse/i.test(title)
-        ? "Penthouse"
-        : /villa/i.test(title)
-        ? "Villa"
-        : /finca/i.test(title)
-        ? "Finca"
-        : "Immobilie",
+      type: inferType(title, url),
       beds: bedsMatch ? Number(bedsMatch[1]) : 0,
       baths: bathsMatch ? Number(bathsMatch[1]) : 0,
       size: m2Match ? Number(m2Match[1]) : 0,
       url,
       image: pickImage(html),
-      description: clean(descriptionMeta ? descriptionMeta[1] : title)
+      description: pickDescription(html, title)
     };
   };
 
   try {
     const listHtml = await fetchText(LIST_URL);
-    const links = extractListingLinks(listHtml).filter((u) =>
-      /\/de\/.*malaga.*\/s2/i.test(u)
-    );
-
+    const links = extractListingLinks(listHtml);
     const uniqueLinks = [...new Set(links)].slice(0, 24);
 
     const properties = [];
@@ -135,7 +149,7 @@ module.exports = async (req, res) => {
         const item = parseDetail(url, detailHtml);
         if (item.title) properties.push(item);
       } catch (err) {
-        // skip broken detail pages
+        // broken detail pages skippen
       }
     }
 
