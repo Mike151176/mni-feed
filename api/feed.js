@@ -1,4 +1,4 @@
-export default async function handler(req, res) {
+module.exports = async (req, res) => {
   const feedUrl =
     "https://feedout.resales-online.com/1025084/kyero-plus/kyero/3.0/1861/Mike-Naumann-Immobilien-Kyero-Plus.xml";
 
@@ -33,7 +33,7 @@ export default async function handler(req, res) {
 
     const propertyBlocks = [...xmlText.matchAll(/<property>([\s\S]*?)<\/property>/gi)];
 
-    const properties = propertyBlocks.slice(0, 50).map((match, index) => {
+    const properties = propertyBlocks.slice(0, 80).map((match, index) => {
       const block = match[1];
 
       const town = getTag(block, "town");
@@ -64,6 +64,7 @@ export default async function handler(req, res) {
       };
     });
 
+    res.setHeader("Content-Type", "application/json");
     res.status(200).json(properties);
   } catch (error) {
     res.status(500).json({
@@ -71,4 +72,4 @@ export default async function handler(req, res) {
       message: error.message
     });
   }
-}
+};
