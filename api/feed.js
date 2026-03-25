@@ -1,4 +1,12 @@
 module.exports = async (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
   const LIST_URL =
     "https://www.mikenaumannimmobilien.com/de/browser/s1?quick_search%5BpropertyTypes%5D=%7B%22g1%22%3A%7B%22tp%22%3A%5B%5D%2C%22tpe%22%3A%5B%5D%2C%22c%22%3Afalse%7D%2C%22g2%22%3A%7B%22tp%22%3A%5B%5D%2C%22tpe%22%3A%5B%5D%2C%22c%22%3Afalse%7D%2C%22g4%22%3A%7B%22tp%22%3A%5B%5D%2C%22tpe%22%3A%5B%5D%2C%22c%22%3Afalse%7D%2C%22g8%22%3A%7B%22tp%22%3A%5B%5D%2C%22tpe%22%3A%5B%5D%2C%22c%22%3Afalse%7D%2C%22g16%22%3A%7B%22tp%22%3A%5B%5D%2C%22tpe%22%3A%5B%5D%2C%22c%22%3Afalse%7D%2C%22text%22%3A%22%22%7D&quick_search%5BfullLoc%5D=%7B%22p%22%3A%5B%5D%2C%22c%22%3A%5B290672%5D%2C%22d%22%3A%5B%5D%2C%22q%22%3A%5B%5D%2C%22text%22%3A%22M%C3%A1laga%22%7D&quick_search%5B_token%5D=BPD70yIFxFFZAUxmX_vu_loN4ufvEKsOsXopp5EeV7I";
 
@@ -148,9 +156,7 @@ module.exports = async (req, res) => {
         const detailHtml = await fetchText(url);
         const item = parseDetail(url, detailHtml);
         if (item.title) properties.push(item);
-      } catch (err) {
-        // broken detail pages skippen
-      }
+      } catch (err) {}
     }
 
     res.setHeader("Content-Type", "application/json");
