@@ -7,12 +7,6 @@ export default async function handler(req, res) {
       .replace(/<!\[CDATA\[(.*?)\]\]>/gs, "$1")
       .trim();
 
-  const normalize = (str = "") =>
-    clean(str)
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "");
-
   const getTag = (block, tag) => {
     const match = block.match(new RegExp(`<${tag}>([\\s\\S]*?)<\\/${tag}>`, "i"));
     return match ? clean(match[1]) : "";
@@ -39,7 +33,7 @@ export default async function handler(req, res) {
 
     const propertyBlocks = [...xmlText.matchAll(/<property>([\s\S]*?)<\/property>/gi)];
 
-    const properties = propertyBlocks.map((match, index) => {
+    const properties = propertyBlocks.slice(0, 50).map((match, index) => {
       const block = match[1];
 
       const town = getTag(block, "town");
@@ -53,31 +47,24 @@ export default async function handler(req, res) {
       const url = getTag(block, "url") || getTag(block, "link");
       const image = getFirstImage(block);
 
-      const locationBlob = normalize(
-        [town, area, location, province, region, title, description].join(" ")
-      );
-
       return {
         title,
         price: parseInt(getTag(block, "price").replace(/[^\d]/g, "")) || 0,
-        location: [town, area, location, province, region].filter(Boolean).join(", "),
+        town,
+        area,
+        location,
+        province,
+        region,
+        fullLocation: [town, area, location, province, region].filter(Boolean).join(", "),
         beds: parseInt(getTag(block, "beds")) || parseInt(getTag(block, "bedrooms")) || 0,
         baths: parseInt(getTag(block, "baths")) || parseInt(getTag(block, "bathrooms")) || 0,
         url: url || "",
         image,
-        description,
-        locationBlob
+        description
       };
     });
 
-    // Málaga-Filter robuster
-    const malagaProperties = properties.filter((item) =>
-      item.locationBlob.includes("malaga")
-    );
-
-    res.status(200).json(
-      malagaProperties.map(({ locationBlob, ...item }) => item)
-    );
+    res.status(200).json(properties);
   } catch (error) {
     res.status(500).json({
       error: "Feed error",
