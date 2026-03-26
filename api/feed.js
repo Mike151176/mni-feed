@@ -1,244 +1,91 @@
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-
-  const BASE = 'https://www.mikenaumannimmobilien.com';
-  const MAIN_LIST_URL = 'https://www.mikenaumannimmobilien.com/de/immobilien/s1/5588';
-  const MALAGA_URL =
-    'https://www.mikenaumannimmobilien.com/de/browser/s1?quick_search%5BfullLoc%5D=%7B%22p%22%3A%5B%5D%2C%22c%22%3A%5B290672%5D%2C%22d%22%3A%5B%5D%2C%22q%22%3A%5B%5D%2C%22text%22%3A%22M%C3%A1laga%22%7D';
-
-  const REGION_NAMES = {
-    malaga: 'Málaga',
-    marbella: 'Marbella',
-    estepona: 'Estepona',
-    malagaprovincia: 'Málaga Provinz'
+  const URLS = {
+    malaga: 'https://www.mikenaumannimmobilien.com/de/browser/s1?quick_search%5BfullLoc%5D=%7B%22c%22%3A%5B290672%5D%7D',
+    marbella: 'https://www.mikenaumannimmobilien.com/de/browser/s1?quick_search%5BfullLoc%5D=%7B%22c%22%3A%5B290691%5D%7D',
+    estepona: 'https://www.mikenaumannimmobilien.com/de/browser/s1?quick_search%5BfullLoc%5D=%7B%22c%22%3A%5B290516%5D%7D',
+    malagaprovincia: 'https://www.mikenaumannimmobilien.com/de/browser/s1?quick_search%5BfullLoc%5D=%7B%22p%22%3A%5B29%5D%7D'
   };
 
   const city = String(req.query.city || 'malaga').toLowerCase();
-  const REGION_NAME = REGION_NAMES[city] || REGION_NAMES.malaga;
-
-  const decodeHtml = (str = '') =>
-    String(str)
-      .replace(/<!\[CDATA\[(.*?)\]\]>/gs, '$1')
-      .replace(/&nbsp;/g, ' ')
-      .replace(/&amp;/g, '&')
-      .replace(/&quot;/g, '"')
-      .replace(/&#39;/g, "'")
-      .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
-      .trim();
-
-  const stripTags = (str = '') =>
-    decodeHtml(str)
-      .replace(/<[^>]+>/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-
-  const normalize = (str = '') =>
-    stripTags(str)
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '');
-
-  const toAbs = (url = '') => {
-    if (!url) return '';
-    if (url.startsWith('http')) return url;
-    if (url.startsWith('//')) return 'https:' + url;
-    return BASE + (url.startsWith('/') ? url : '/' + url);
-  };
+  const TARGET_URL = URLS[city] || URLS.malaga;
 
   const fetchText = async (url) => {
-    const response = await fetch(url, {
+    const r = await fetch(url, {
       headers: {
-        'user-agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122 Safari/537.36',
-        accept: 'text/html,application/xhtml+xml'
+        'user-agent': 'Mozilla/5.0'
       }
     });
-    return await response.text();
+    return await r.text();
   };
 
-  const extractListingLinks = (html) => {
-    const links = new Set();
-    const patterns = [
-      /href="([^"]*\/de\/[^"]*\/s2)"/gi,
-      /href="([^"]*\/de\/[^"]*zum-verkauf[^"]*\/s2)"/gi
-    ];
+  const BASE = 'https://www.mikenaumannimmobilien.com';
 
-    patterns.forEach((pattern) => {
-      let match;
-      while ((match = pattern.exec(html)) !== null) {
-        const url = toAbs(match[1]);
-        if (/\/de\//i.test(url) && /\/s2$/i.test(url)) {
-          links.add(url);
-        }
-      }
-    });
+  const extractLinks = (html) => {
+    const links = new Set();
+    const regex = /href="([^"]*\/de\/[^"]*\/s2)"/gi;
+
+    let m;
+    while ((m = regex.exec(html)) !== null) {
+      let url = m[1];
+      if (!url.startsWith('http')) url = BASE + url;
+      links.add(url);
+    }
 
     return [...links];
   };
 
-  const titleFromUrl = (url) => {
-    const slug = url.split('/de/')[1]?.split('/s2')[0] || '';
-    return slug
-      .replace(/\/\d+$/, '')
-      .replace(/-zum-verkauf-in-[^/]+/gi, '')
-      .replace(/-zu-verkauf-in-[^/]+/gi, '')
-      .replace(/-/g, ' ')
-      .replace(/\b\w/g, (m) => m.toUpperCase())
-      .trim();
-  };
+  const clean = (str = '') =>
+    str.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
 
-  const inferType = (title, url) => {
-    const text = `${title} ${url}`.toLowerCase();
-    if (text.includes('apartment') || text.includes('appartment')) return 'Apartment';
-    if (text.includes('penthouse')) return 'Penthouse';
-    if (text.includes('villa')) return 'Villa';
-    if (text.includes('finca')) return 'Finca';
-    if (text.includes('townhouse') || text.includes('adosado')) return 'Townhouse';
-    if (text.includes('studio')) return 'Studio';
-    return 'Immobilie';
-  };
+  const parseDetail = async (url) => {
+    try {
+      const html = await fetchText(url);
 
-  const pickImage = (html) => {
-    const patterns = [
-      /<meta[^>]+property="og:image"[^>]+content="([^"]+)"/i,
-      /<meta[^>]+name="twitter:image"[^>]+content="([^"]+)"/i,
-      /<img[^>]+src="([^"]*property_[^"]+\.(?:jpg|jpeg|png|webp))"/i,
-      /<img[^>]+data-src="([^"]*property_[^"]+\.(?:jpg|jpeg|png|webp))"/i
-    ];
+      const titleMatch =
+        html.match(/<title>(.*?)<\/title>/i) ||
+        html.match(/<h1.*?>(.*?)<\/h1>/i);
 
-    for (const pattern of patterns) {
-      const match = html.match(pattern);
-      if (match && match[1]) return toAbs(decodeHtml(match[1]));
+      const title = clean(titleMatch ? titleMatch[1] : 'Immobilie');
+
+      const priceMatch = html.match(/([\d\.]+)\s?€/);
+      const price = priceMatch ? parseInt(priceMatch[1].replace(/\./g, '')) : 0;
+
+      const imgMatch = html.match(/property_\d+.*?\.jpg/);
+      const image = imgMatch
+        ? 'https://mikenaumannimmobilien.com/' + imgMatch[0]
+        : '';
+
+      return {
+        title,
+        price,
+        location: city,
+        url,
+        image,
+        beds: 0,
+        baths: 0,
+        size: 0,
+        description: title
+      };
+    } catch {
+      return null;
     }
-
-    return '';
-  };
-
-  const pickDescription = (html, fallbackTitle) => {
-    const meta =
-      html.match(/<meta[^>]+name="description"[^>]+content="([^"]+)"/i) ||
-      html.match(/<meta[^>]+property="og:description"[^>]+content="([^"]+)"/i);
-
-    const text = stripTags(meta ? meta[1] : '');
-    if (!text || /verwendung von cookies/i.test(text)) return fallbackTitle;
-    return text;
-  };
-
-  const parseDetail = (url, html, locationName) => {
-    const rawTitle =
-      html.match(/<meta[^>]+property="og:title"[^>]+content="([^"]+)"/i) ||
-      html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i) ||
-      html.match(/<title>([\s\S]*?)<\/title>/i);
-
-    let title = stripTags(rawTitle ? rawTitle[1] : '');
-    if (!title || /verwendung von cookies/i.test(title)) {
-      title = titleFromUrl(url);
-    }
-
-    title = title
-      .replace(/\s*\|\s*Mike Naumann Immobilien.*$/i, '')
-      .replace(/\s*-\s*Mike Naumann Immobilien.*$/i, '')
-      .trim();
-
-    const priceMatch =
-      html.match(/(\d{1,3}(?:\.\d{3})+)\s*€/i) ||
-      html.match(/(\d{3,7})\s*€/i);
-
-    const price = priceMatch ? Number(priceMatch[1].replace(/\./g, '')) : 0;
-
-    const bedsMatch =
-      html.match(/(\d+)\s*(?:Schlafzimmer|bedrooms|habitaciones|hab\.)/i);
-    const bathsMatch =
-      html.match(/(\d+)\s*(?:Badezimmer|bathrooms|baños)/i);
-    const m2Match = html.match(/(\d+)\s*m(?:²|2)/i);
-
-    return {
-      title,
-      price,
-      location: locationName,
-      type: inferType(title, url),
-      beds: bedsMatch ? Number(bedsMatch[1]) : 0,
-      baths: bathsMatch ? Number(bathsMatch[1]) : 0,
-      size: m2Match ? Number(m2Match[1]) : 0,
-      url,
-      image: pickImage(html),
-      description: pickDescription(html, title)
-    };
-  };
-
-  const isMarbellaUrl = (url) => normalize(url).includes('/marbella/');
-  const isEsteponaUrl = (url) => normalize(url).includes('/estepona/');
-  const isMalagaUrl = (url) => normalize(url).includes('in-malaga/');
-
-  const isMalagaProvinceUrl = (url) => {
-    const text = normalize(url);
-    return (
-      text.includes('/archidona/') ||
-      text.includes('/benahavis/') ||
-      text.includes('/benalmadena/') ||
-      text.includes('/casares/') ||
-      text.includes('/estepona/') ||
-      text.includes('/fuengirola/') ||
-      text.includes('/malaga/') ||
-      text.includes('/manilva/') ||
-      text.includes('/marbella/') ||
-      text.includes('/mijas/') ||
-      text.includes('/nerja/') ||
-      text.includes('/ojen/') ||
-      text.includes('/rincon-de-la-victoria/') ||
-      text.includes('/torremolinos/') ||
-      text.includes('/velez-malaga/') ||
-      text.includes('/frigiliana/') ||
-      text.includes('/competa/') ||
-      text.includes('/antequera/') ||
-      text.includes('/canete-la-real/') ||
-      text.includes('/villanueva-de-algaidas/') ||
-      text.includes('/moraleda-de-zafayona/')
-    );
   };
 
   try {
-    let links = [];
+    const listHtml = await fetchText(TARGET_URL);
+    const links = extractLinks(listHtml).slice(0, 50);
 
-    if (city === 'malaga') {
-      const listHtml = await fetchText(MALAGA_URL);
-      links = extractListingLinks(listHtml).filter(isMalagaUrl);
-    } else {
-      const listHtml = await fetchText(MAIN_LIST_URL);
-      links = extractListingLinks(listHtml);
+    const results = [];
 
-      if (city === 'marbella') {
-        links = links.filter(isMarbellaUrl);
-      } else if (city === 'estepona') {
-        links = links.filter(isEsteponaUrl);
-      } else if (city === 'malagaprovincia') {
-        links = links.filter(isMalagaProvinceUrl);
-      }
+    for (const url of links) {
+      const item = await parseDetail(url);
+      if (item) results.push(item);
     }
 
-    const uniqueLinks = [...new Set(links)].slice(0, 80);
-
-    const properties = [];
-    for (const url of uniqueLinks) {
-      try {
-        const detailHtml = await fetchText(url);
-        const item = parseDetail(url, detailHtml, REGION_NAME);
-        properties.push(item);
-      } catch (err) {}
-    }
-
-    res.setHeader('Content-Type', 'application/json');
-    res.status(200).json(properties);
-  } catch (error) {
-    res.status(500).json({
-      error: 'Website scrape error',
-      message: error.message
-    });
+    res.status(200).json(results);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
   }
 };
