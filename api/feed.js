@@ -11,13 +11,13 @@ module.exports = async (req, res) => {
 
   const REGION_URLS = {
     malaga:
-      'https://www.mikenaumannimmobilien.com/de/browser/s1?quick_search%5BpropertyTypes%5D=%7B%22g1%22%3A%7B%22tp%22%3A%5B%5D%2C%22tpe%22%3A%5B%5D%2C%22c%22%3Afalse%7D%2C%22g2%22%3A%7B%22tp%22%3A%5B%5D%2C%22tpe%22%3A%5B%5D%2C%22c%22%3Afalse%7D%2C%22g4%22%3A%7B%22tp%22%3A%5B%5D%2C%22tpe%22%3A%5B%5D%2C%22c%22%3Afalse%7D%2C%22g8%22%3A%7B%22tp%22%3A%5B%5D%2C%22tpe%22%3A%5B%5D%2C%22c%22%3Afalse%7D%2C%22g16%22%3A%7B%22tp%22%3A%5B%5D%2C%22tpe%22%3A%5B%5D%2C%22c%22%3Afalse%7D%2C%22text%22%3A%22%22%7D&quick_search%5BfullLoc%5D=%7B%22p%22%3A%5B%5D%2C%22c%22%3A%5B290672%5D%2C%22d%22%3A%5B%5D%2C%22q%22%3A%5B%5D%2C%22text%22%3A%22M%C3%A1laga%22%7D',
+      'https://www.mikenaumannimmobilien.com/de/browser/s1?quick_search%5BfullLoc%5D=%7B%22p%22%3A%5B%5D%2C%22c%22%3A%5B290672%5D%2C%22d%22%3A%5B%5D%2C%22q%22%3A%5B%5D%2C%22text%22%3A%22M%C3%A1laga%22%7D',
 
     marbella:
-      'https://www.mikenaumannimmobilien.com/de/browser/s1?quick_search%5BpropertyTypes%5D=%7B%22g1%22%3A%7B%22tp%22%3A%5B%5D%2C%22tpe%22%3A%5B%5D%2C%22c%22%3Afalse%7D%2C%22g2%22%3A%7B%22tp%22%3A%5B%5D%2C%22tpe%22%3A%5B%5D%2C%22c%22%3Afalse%7D%2C%22g4%22%3A%7B%22tp%22%3A%5B%5D%2C%22tpe%22%3A%5B%5D%2C%22c%22%3Afalse%7D%2C%22g8%22%3A%7B%22tp%22%3A%5B%5D%2C%22tpe%22%3A%5B%5D%2C%22c%22%3Afalse%7D%2C%22g16%22%3A%7B%22tp%22%3A%5B%5D%2C%22tpe%22%3A%5B%5D%2C%22c%22%3Afalse%7D%2C%22text%22%3A%22%22%7D&quick_search%5BfullLoc%5D=%7B%22p%22%3A%5B%5D%2C%22c%22%3A%5B290648%5D%2C%22d%22%3A%5B%5D%2C%22q%22%3A%5B%5D%2C%22text%22%3A%22Marbella%22%7D',
+      'https://www.mikenaumannimmobilien.com/de/browser/s1?quick_search%5BfullLoc%5D=%7B%22p%22%3A%5B%5D%2C%22c%22%3A%5B290648%5D%2C%22d%22%3A%5B%5D%2C%22q%22%3A%5B%5D%2C%22text%22%3A%22Marbella%22%7D',
 
     estepona:
-      'https://www.mikenaumannimmobilien.com/de/browser/s1?quick_search%5BpropertyTypes%5D=%7B%22g1%22%3A%7B%22tp%22%3A%5B%5D%2C%22tpe%22%3A%5B%5D%2C%22c%22%3Afalse%7D%2C%22g2%22%3A%7B%22tp%22%3A%5B%5D%2C%22tpe%22%3A%5B%5D%2C%22c%22%3Afalse%7D%2C%22g4%22%3A%7B%22tp%22%3A%5B%5D%2C%22tpe%22%3A%5B%5D%2C%22c%22%3Afalse%7D%2C%22g8%22%3A%7B%22tp%22%3A%5B%5D%2C%22tpe%22%3A%5B%5D%2C%22c%22%3Afalse%7D%2C%22g16%22%3A%7B%22tp%22%3A%5B%5D%2C%22tpe%22%3A%5B%5D%2C%22c%22%3Afalse%7D%2C%22text%22%3A%22%22%7D&quick_search%5BfullLoc%5D=%7B%22p%22%3A%5B%5D%2C%22c%22%3A%5B290697%5D%2C%22d%22%3A%5B%5D%2C%22q%22%3A%5B%5D%2C%22text%22%3A%22Estepona%22%7D',
+      'https://www.mikenaumannimmobilien.com/de/browser/s1?quick_search%5BfullLoc%5D=%7B%22p%22%3A%5B%5D%2C%22c%22%3A%5B290697%5D%2C%22d%22%3A%5B%5D%2C%22q%22%3A%5B%5D%2C%22text%22%3A%22Estepona%22%7D',
 
     malagaprovincia:
       'https://www.mikenaumannimmobilien.com/de/immobilien/s1/5588'
@@ -142,7 +142,7 @@ module.exports = async (req, res) => {
     return text;
   };
 
-  const parseDetail = (url, html) => {
+  const parseDetail = (url, html, locationName) => {
     const rawTitle =
       html.match(/<meta[^>]+property="og:title"[^>]+content="([^"]+)"/i) ||
       html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i) ||
@@ -173,7 +173,7 @@ module.exports = async (req, res) => {
     return {
       title,
       price,
-      location: REGION_NAME,
+      location: locationName,
       type: inferType(title, url),
       beds: bedsMatch ? Number(bedsMatch[1]) : 0,
       baths: bathsMatch ? Number(bathsMatch[1]) : 0,
@@ -184,58 +184,50 @@ module.exports = async (req, res) => {
     };
   };
 
-  const regionMatches = (url, cityKey) => {
+  const isMalagaProvinceUrl = (url) => {
     const text = normalize(url);
-
-    if (cityKey === 'malaga') {
-      return text.includes('in-malaga/');
-    }
-
-    if (cityKey === 'marbella') {
-      return text.includes('in-marbella/');
-    }
-
-    if (cityKey === 'estepona') {
-      return text.includes('in-estepona/');
-    }
-
-    if (cityKey === 'malagaprovincia') {
-      return (
-        text.includes('/malaga-provincia/') ||
-        text.includes('malaga provincia') ||
-        text.includes('/antequera/') ||
-        text.includes('/rincon-de-la-victoria/') ||
-        text.includes('/torrox/') ||
-        text.includes('/frigiliana/') ||
-        text.includes('/competa/') ||
-        text.includes('/archidona/') ||
-        text.includes('/alfarnate/') ||
-        text.includes('/sayalonga/') ||
-        text.includes('/canillas-de-aceituno/') ||
-        text.includes('/velez-malaga/') ||
-        text.includes('/nerja/') ||
-        text.includes('/iznajar/') ||
-        text.includes('/villanueva-de-algaidas/') ||
-        text.includes('/moraleda-de-zafayona/') ||
-        text.includes('/canete-la-real/')
-      ) && !text.includes('in-malaga/');
-    }
-
-    return true;
+    return (
+      text.includes('/archidona/') ||
+      text.includes('/benahavis/') ||
+      text.includes('/benalmadena/') ||
+      text.includes('/casares/') ||
+      text.includes('/estepona/') ||
+      text.includes('/fuengirola/') ||
+      text.includes('/malaga/') ||
+      text.includes('/manilva/') ||
+      text.includes('/marbella/') ||
+      text.includes('/mijas/') ||
+      text.includes('/nerja/') ||
+      text.includes('/ojen/') ||
+      text.includes('/rincon-de-la-victoria/') ||
+      text.includes('/torremolinos/') ||
+      text.includes('/velez-malaga/') ||
+      text.includes('/frigiliana/') ||
+      text.includes('/competa/') ||
+      text.includes('/antequera/') ||
+      text.includes('/canete-la-real/') ||
+      text.includes('/villanueva-de-algaidas/') ||
+      text.includes('/moraleda-de-zafayona/')
+    );
   };
 
   try {
     const listHtml = await fetchText(LIST_URL);
     const links = extractListingLinks(listHtml);
 
-    const filteredLinks = links.filter((url) => regionMatches(url, city));
+    let filteredLinks = links;
+
+    if (city === 'malagaprovincia') {
+      filteredLinks = links.filter(isMalagaProvinceUrl);
+    }
+
     const uniqueLinks = [...new Set(filteredLinks.length ? filteredLinks : links)].slice(0, 80);
 
     const properties = [];
     for (const url of uniqueLinks) {
       try {
         const detailHtml = await fetchText(url);
-        const item = parseDetail(url, detailHtml);
+        const item = parseDetail(url, detailHtml, REGION_NAME);
         properties.push(item);
       } catch (err) {}
     }
