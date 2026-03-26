@@ -8,20 +8,9 @@ module.exports = async (req, res) => {
   }
 
   const BASE = 'https://www.mikenaumannimmobilien.com';
-
-  const REGION_URLS = {
-    malaga:
-      'https://www.mikenaumannimmobilien.com/de/browser/s1?quick_search%5BfullLoc%5D=%7B%22p%22%3A%5B%5D%2C%22c%22%3A%5B290672%5D%2C%22d%22%3A%5B%5D%2C%22q%22%3A%5B%5D%2C%22text%22%3A%22M%C3%A1laga%22%7D',
-
-    marbella:
-      'https://www.mikenaumannimmobilien.com/de/browser/s1?quick_search%5BfullLoc%5D=%7B%22p%22%3A%5B%5D%2C%22c%22%3A%5B290648%5D%2C%22d%22%3A%5B%5D%2C%22q%22%3A%5B%5D%2C%22text%22%3A%22Marbella%22%7D',
-
-    estepona:
-      'https://www.mikenaumannimmobilien.com/de/browser/s1?quick_search%5BfullLoc%5D=%7B%22p%22%3A%5B%5D%2C%22c%22%3A%5B290697%5D%2C%22d%22%3A%5B%5D%2C%22q%22%3A%5B%5D%2C%22text%22%3A%22Estepona%22%7D',
-
-    malagaprovincia:
-      'https://www.mikenaumannimmobilien.com/de/immobilien/s1/5588'
-  };
+  const MAIN_LIST_URL = 'https://www.mikenaumannimmobilien.com/de/immobilien/s1/5588';
+  const MALAGA_URL =
+    'https://www.mikenaumannimmobilien.com/de/browser/s1?quick_search%5BfullLoc%5D=%7B%22p%22%3A%5B%5D%2C%22c%22%3A%5B290672%5D%2C%22d%22%3A%5B%5D%2C%22q%22%3A%5B%5D%2C%22text%22%3A%22M%C3%A1laga%22%7D';
 
   const REGION_NAMES = {
     malaga: 'Málaga',
@@ -31,7 +20,6 @@ module.exports = async (req, res) => {
   };
 
   const city = String(req.query.city || 'malaga').toLowerCase();
-  const LIST_URL = REGION_URLS[city] || REGION_URLS.malaga;
   const REGION_NAME = REGION_NAMES[city] || REGION_NAMES.malaga;
 
   const decodeHtml = (str = '') =>
@@ -184,6 +172,10 @@ module.exports = async (req, res) => {
     };
   };
 
+  const isMarbellaUrl = (url) => normalize(url).includes('/marbella/');
+  const isEsteponaUrl = (url) => normalize(url).includes('/estepona/');
+  const isMalagaUrl = (url) => normalize(url).includes('in-malaga/');
+
   const isMalagaProvinceUrl = (url) => {
     const text = normalize(url);
     return (
@@ -212,16 +204,25 @@ module.exports = async (req, res) => {
   };
 
   try {
-    const listHtml = await fetchText(LIST_URL);
-    const links = extractListingLinks(listHtml);
+    let links = [];
 
-    let filteredLinks = links;
+    if (city === 'malaga') {
+      const listHtml = await fetchText(MALAGA_URL);
+      links = extractListingLinks(listHtml).filter(isMalagaUrl);
+    } else {
+      const listHtml = await fetchText(MAIN_LIST_URL);
+      links = extractListingLinks(listHtml);
 
-    if (city === 'malagaprovincia') {
-      filteredLinks = links.filter(isMalagaProvinceUrl);
+      if (city === 'marbella') {
+        links = links.filter(isMarbellaUrl);
+      } else if (city === 'estepona') {
+        links = links.filter(isEsteponaUrl);
+      } else if (city === 'malagaprovincia') {
+        links = links.filter(isMalagaProvinceUrl);
+      }
     }
 
-    const uniqueLinks = [...new Set(filteredLinks.length ? filteredLinks : links)].slice(0, 80);
+    const uniqueLinks = [...new Set(links)].slice(0, 80);
 
     const properties = [];
     for (const url of uniqueLinks) {
